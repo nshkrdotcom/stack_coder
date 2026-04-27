@@ -1,0 +1,73 @@
+{
+  "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "agent_loop_workflow_ref": "workflow://agent-loop/run-stack-coder-stack-coder-local-fixture",
+  "session_refs": [
+    "session://stack-coder/local-fixture"
+  ],
+  "subject_ref": "subject://stack-coder/local-task",
+  "network_required?": false,
+  "event_refs": [
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/1",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/2",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/3",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/4",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/5",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/6",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/7",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/8",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/9",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/10",
+    "event://agent-loop/run-stack-coder-stack-coder-local-fixture/11"
+  ],
+  "run_ref": "run://stack-coder/stack-coder-local-fixture",
+  "lower_refs": [
+    "lower-submission://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1",
+    "lower-receipt://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1"
+  ],
+  "terminal_state": "completed",
+  "receipt_state": "proven",
+  "authority_decision_refs": [
+    "authority-decision://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1"
+  ],
+  "profile_ref": "profile://stack-coder/local-fixture/v1",
+  "workspace_refs": [
+    "workspace://stack-coder/local-fixture"
+  ],
+  "release_manifest_ref": "release-manifest://stack-coder/local-fixture/v1",
+  "execution_outcome_refs": [
+    "lower-receipt://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1",
+    "action-receipt://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1"
+  ],
+  "mechanisms": [
+    "M1",
+    "M2"
+  ],
+  "codex_used?": false,
+  "turn_refs": [
+    "turn://agent-loop/run-stack-coder-stack-coder-local-fixture/1"
+  ],
+  "github_used?": false,
+  "provider_credentials_required?": false,
+  "headless_readback_hash": "sha256:43761b69d11d5c03c828643694d2514392f3aa016b7c8d6d03cedd35aee3eb14",
+  "proof_class": "offline_e2e",
+  "cli_output_hash": "sha256:2e9a4ac89ed07539f99ba028544535b92c499586b1578f73507f7130d27daa4d",
+  "execution_governance_refs": [
+    "authority-decision://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1"
+  ],
+  "schema_ref": "agentic_substrate_local_e2e_v1",
+  "agentic_core_proven?": true,
+  "receipt_name": "agentic_substrate_local_e2e_v1",
+  "tool_action_request_refs": [
+    "action://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1"
+  ],
+  "runtime_event_count": 11,
+  "provider_network_access?": false,
+  "worker_refs": [
+    "worker://stack-coder/local-fixture"
+  ],
+  "tool_action_receipt_refs": [
+    "action-receipt://agent-loop/turn-agent-loop-run-stack-coder-stack-coder-local-fixture-1"
+  ],
+  "memory_profile_ref": "none",
+  "linear_used?": false
+}
