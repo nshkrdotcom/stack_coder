@@ -91,6 +91,7 @@ defmodule StackCoder.LocalE2ETest do
     assert {:ok, command} = LocalHost.cancel(run.future.run_ref)
     assert command["command_kind"] == "cancel"
     assert command["accepted?"] == true
+    assert command["command_ref"] == "command://cancel/run-stack-coder-stack-coder-cancel"
   end
 
   test "CLI JSON output matches presenter readback shape" do
@@ -110,22 +111,77 @@ defmodule StackCoder.LocalE2ETest do
     assert decoded["run_ref"] == run.future.run_ref
   end
 
+  test "repo-owned code avoids pattern engine APIs" do
+    assert_no_source_hits(pattern_engine_tokens(), code_files())
+  end
+
+  test "repo-owned code avoids dynamic atom conversion APIs" do
+    assert_no_source_hits(atom_conversion_tokens(), code_files())
+  end
+
   test "runtime modules do not import lower runtime internals or provider selectors" do
-    lib_files = Path.wildcard("lib/**/*.ex")
+    lib_files = runtime_files()
 
     assert lib_files != []
 
     Enum.each(lib_files, fn path ->
       contents = File.read!(path)
 
-      refute Regex.match?(
-               ~r/Mezzanine\.|Citadel\.|Jido\.Integration|ExecutionPlane|OuterBrain\./,
-               contents
-             ),
-             "#{path} bypasses AppKit"
+      assert_no_source_hits(
+        ["Mezzanine.", "Citadel.", "Jido.Integration", "ExecutionPlane", "OuterBrain."],
+        [{path, contents}],
+        "bypasses AppKit"
+      )
 
-      refute Regex.match?(~r/Linear|Codex|GitHub|OpenAI|Anthropic|claude|gpt-/, contents),
-             "#{path} leaks provider vocabulary"
+      assert_no_source_hits(
+        ["Linear", "Codex", "GitHub", "OpenAI", "Anthropic", "claude", "gpt-"],
+        [{path, contents}],
+        "leaks provider vocabulary"
+      )
     end)
+  end
+
+  defp code_files do
+    Path.wildcard("{lib,test}/**/*.{ex,exs}")
+    |> Enum.map(&{&1, File.read!(&1)})
+  end
+
+  defp runtime_files do
+    Path.wildcard("lib/**/*.ex")
+  end
+
+  defp pattern_engine_tokens do
+    [
+      "Reg" <> "ex",
+      "~" <> "r",
+      ":r" <> "e.",
+      "String.mat" <> "ch",
+      "Reg" <> "Exp",
+      "reg" <> "exp",
+      "re.comp" <> "ile",
+      "import r" <> "e"
+    ]
+  end
+
+  defp atom_conversion_tokens do
+    [
+      "String.to_" <> "atom",
+      "String.to_existing_" <> "atom",
+      "binary_to_" <> "atom",
+      "binary_to_existing_" <> "atom",
+      "list_to_" <> "atom",
+      "list_to_existing_" <> "atom"
+    ]
+  end
+
+  defp assert_no_source_hits(tokens, files, reason \\ "contains forbidden source token") do
+    hits =
+      for {path, contents} <- files,
+          token <- tokens,
+          String.contains?(contents, token) do
+        {path, token}
+      end
+
+    assert hits == [], "#{inspect(hits)} #{reason}"
   end
 end

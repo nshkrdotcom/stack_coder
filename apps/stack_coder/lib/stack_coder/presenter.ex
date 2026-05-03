@@ -27,7 +27,7 @@ defmodule StackCoder.Presenter do
     }
   end
 
-  @spec present_detail(RuntimeRunDetail.t()) :: map()
+  @spec present_detail(struct()) :: map()
   def present_detail(%RuntimeRunDetail{} = detail) do
     %{
       "schema_ref" => detail.schema_ref,
@@ -42,10 +42,10 @@ defmodule StackCoder.Presenter do
     }
   end
 
-  @spec present_events([RuntimeEventRow.t()]) :: [map()]
+  @spec present_events([struct()]) :: [map()]
   def present_events(events), do: Enum.map(events, &present_event/1)
 
-  @spec present_command(CommandResult.t()) :: map()
+  @spec present_command(struct()) :: map()
   def present_command(%CommandResult{} = command) do
     %{
       "schema_ref" => "runtime_readback/command_result.v1",
@@ -73,9 +73,7 @@ defmodule StackCoder.Presenter do
     if Keyword.get(opts, :json?, false) do
       Jason.encode!(payload, pretty: true)
     else
-      payload
-      |> Enum.map(&render_text/1)
-      |> Enum.join("\n")
+      Enum.map_join(payload, "\n", &render_text/1)
     end
   end
 

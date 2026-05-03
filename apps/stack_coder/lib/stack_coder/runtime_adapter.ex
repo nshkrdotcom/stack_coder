@@ -11,8 +11,9 @@ defmodule StackCoder.RuntimeAdapter do
   @spec run(map()) :: {:ok, struct()} | {:error, term()}
   def run(attrs) when is_map(attrs) do
     ensure_table!()
+    agent_loop = agent_loop_module()
 
-    with {:ok, projection} <- apply(agent_loop_module(), :run, [attrs]) do
+    with {:ok, projection} <- agent_loop.run(attrs) do
       :ets.insert(@table, {projection.run_ref, projection})
       {:ok, projection}
     end

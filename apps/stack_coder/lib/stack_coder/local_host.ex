@@ -69,7 +69,7 @@ defmodule StackCoder.LocalHost do
   end
 
   @spec request_for_task(String.t() | map(), keyword()) ::
-          {:ok, AgentRunRequest.t()} | {:error, term()}
+          {:ok, struct()} | {:error, term()}
   def request_for_task(task, opts \\ []) do
     Config.defaults(opts)
     |> then(&agent_run_request(task, &1))

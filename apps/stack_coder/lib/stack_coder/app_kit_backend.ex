@@ -266,7 +266,26 @@ defmodule StackCoder.AppKitBackend do
 
   defp ref_suffix(ref) when is_binary(ref) do
     ref
-    |> String.replace(~r/[^A-Za-z0-9]+/, "-")
-    |> String.trim("-")
+    |> :binary.bin_to_list()
+    |> Enum.reduce({[], :start}, &append_ref_suffix_byte/2)
+    |> elem(0)
+    |> trim_reversed_separator()
+    |> Enum.reverse()
+    |> List.to_string()
   end
+
+  defp append_ref_suffix_byte(byte, {acc, _state}) when byte in ?A..?Z,
+    do: {[byte | acc], :char}
+
+  defp append_ref_suffix_byte(byte, {acc, _state}) when byte in ?a..?z,
+    do: {[byte | acc], :char}
+
+  defp append_ref_suffix_byte(byte, {acc, _state}) when byte in ?0..?9,
+    do: {[byte | acc], :char}
+
+  defp append_ref_suffix_byte(_byte, {acc, :char}), do: {[?- | acc], :separator}
+  defp append_ref_suffix_byte(_byte, {acc, state}), do: {acc, state}
+
+  defp trim_reversed_separator([?- | rest]), do: rest
+  defp trim_reversed_separator(chars), do: chars
 end

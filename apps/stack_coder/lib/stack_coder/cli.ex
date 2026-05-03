@@ -30,47 +30,40 @@ defmodule StackCoder.CLI do
         ]
       )
 
-    cond do
-      invalid != [] ->
-        {:error, {:invalid_options, invalid}}
-
-      run_ref = Keyword.get(opts, :cancel) ->
-        {:cancel, run_ref, cli_opts(opts)}
-
-      run_ref = Keyword.get(opts, :resume) ->
-        {:detail, run_ref, cli_opts(opts)}
-
-      run_ref = Keyword.get(opts, :detail) ->
-        {:detail, run_ref, cli_opts(opts)}
-
-      run_ref = Keyword.get(opts, :events) ->
-        {:events, run_ref, cli_opts(opts)}
-
-      Keyword.get(opts, :watch, false) ->
-        {:events, positional_ref(positional), cli_opts(opts)}
-
-      Keyword.has_key?(opts, :task) ->
-        {:run, Keyword.fetch!(opts, :task), cli_opts(opts)}
-
-      positional == ["run"] and Keyword.has_key?(opts, :task) ->
-        {:run, Keyword.fetch!(opts, :task), cli_opts(opts)}
-
-      match?(["status", _], positional) or match?(["detail", _], positional) ->
-        [_cmd, run_ref] = positional
-        {:detail, run_ref, cli_opts(opts)}
-
-      match?(["events", _], positional) ->
-        [_cmd, run_ref] = positional
-        {:events, run_ref, cli_opts(opts)}
-
-      match?(["cancel", _], positional) ->
-        [_cmd, run_ref] = positional
-        {:cancel, run_ref, cli_opts(opts)}
-
-      true ->
-        {:error, :missing_command}
+    case invalid do
+      [] -> parse_valid(opts, positional)
+      _ -> {:error, {:invalid_options, invalid}}
     end
   end
+
+  defp parse_valid(opts, positional) do
+    option_command(opts, positional) ||
+      positional_command(opts, positional) ||
+      {:error, :missing_command}
+  end
+
+  defp option_command(opts, positional) do
+    cond do
+      run_ref = Keyword.get(opts, :cancel) -> {:cancel, run_ref, cli_opts(opts)}
+      run_ref = Keyword.get(opts, :resume) -> {:detail, run_ref, cli_opts(opts)}
+      run_ref = Keyword.get(opts, :detail) -> {:detail, run_ref, cli_opts(opts)}
+      run_ref = Keyword.get(opts, :events) -> {:events, run_ref, cli_opts(opts)}
+      Keyword.get(opts, :watch, false) -> {:events, positional_ref(positional), cli_opts(opts)}
+      Keyword.has_key?(opts, :task) -> {:run, Keyword.fetch!(opts, :task), cli_opts(opts)}
+      true -> nil
+    end
+  end
+
+  defp positional_command(opts, ["run"]) do
+    if Keyword.has_key?(opts, :task), do: {:run, Keyword.fetch!(opts, :task), cli_opts(opts)}
+  end
+
+  defp positional_command(opts, [cmd, run_ref]) when cmd in ["status", "detail"],
+    do: {:detail, run_ref, cli_opts(opts)}
+
+  defp positional_command(opts, ["events", run_ref]), do: {:events, run_ref, cli_opts(opts)}
+  defp positional_command(opts, ["cancel", run_ref]), do: {:cancel, run_ref, cli_opts(opts)}
+  defp positional_command(_opts, _positional), do: nil
 
   defp positional_ref([_cmd, run_ref]), do: run_ref
   defp positional_ref([run_ref]), do: run_ref

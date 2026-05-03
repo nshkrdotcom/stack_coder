@@ -88,38 +88,63 @@ defmodule StackCoder.Receipt do
       "release_manifest_ref"
     ]
 
-    cond do
-      not Enum.all?(required, &Map.has_key?(receipt, &1)) ->
-        {:error, :missing_required_receipt_field}
-
-      receipt["receipt_name"] != @receipt_name ->
-        {:error, :invalid_receipt_name}
-
-      receipt["mechanisms"] != ["M1", "M2"] ->
-        {:error, :invalid_mechanisms}
-
-      receipt["provider_network_access?"] != false or receipt["network_required?"] != false ->
-        {:error, :network_not_allowed}
-
-      receipt["linear_used?"] != false or receipt["github_used?"] != false or
-          receipt["codex_used?"] != false ->
-        {:error, :provider_not_allowed}
-
-      receipt["memory_profile_ref"] != "none" ->
-        {:error, :memory_not_allowed_before_phase_7}
-
-      receipt["agentic_core_proven?"] != true ->
-        {:error, :receipt_does_not_claim_true_proof}
-
-      receipt["authority_decision_refs"] == [] or receipt["execution_outcome_refs"] == [] ->
-        {:error, :missing_agent_loop_proof_refs}
-
-      true ->
-        :ok
+    with :ok <- validate_required_fields(receipt, required),
+         :ok <- validate_receipt_name(receipt),
+         :ok <- validate_mechanisms(receipt),
+         :ok <- validate_network_scope(receipt),
+         :ok <- validate_provider_scope(receipt),
+         :ok <- validate_memory_scope(receipt),
+         :ok <- validate_proof_claim(receipt) do
+      validate_agent_loop_refs(receipt)
     end
   end
 
   def validate(_receipt), do: {:error, :invalid_receipt}
+
+  defp validate_required_fields(receipt, required) do
+    if Enum.all?(required, &Map.has_key?(receipt, &1)) do
+      :ok
+    else
+      {:error, :missing_required_receipt_field}
+    end
+  end
+
+  defp validate_receipt_name(%{"receipt_name" => @receipt_name}), do: :ok
+  defp validate_receipt_name(_receipt), do: {:error, :invalid_receipt_name}
+
+  defp validate_mechanisms(%{"mechanisms" => ["M1", "M2"]}), do: :ok
+  defp validate_mechanisms(_receipt), do: {:error, :invalid_mechanisms}
+
+  defp validate_network_scope(%{
+         "provider_network_access?" => false,
+         "network_required?" => false
+       }),
+       do: :ok
+
+  defp validate_network_scope(_receipt), do: {:error, :network_not_allowed}
+
+  defp validate_provider_scope(%{
+         "linear_used?" => false,
+         "github_used?" => false,
+         "codex_used?" => false
+       }),
+       do: :ok
+
+  defp validate_provider_scope(_receipt), do: {:error, :provider_not_allowed}
+
+  defp validate_memory_scope(%{"memory_profile_ref" => "none"}), do: :ok
+  defp validate_memory_scope(_receipt), do: {:error, :memory_not_allowed_before_phase_7}
+
+  defp validate_proof_claim(%{"agentic_core_proven?" => true}), do: :ok
+  defp validate_proof_claim(_receipt), do: {:error, :receipt_does_not_claim_true_proof}
+
+  defp validate_agent_loop_refs(%{
+         "authority_decision_refs" => [_ | _],
+         "execution_outcome_refs" => [_ | _]
+       }),
+       do: :ok
+
+  defp validate_agent_loop_refs(_receipt), do: {:error, :missing_agent_loop_proof_refs}
 
   @spec write!(map(), String.t()) :: String.t()
   def write!(receipt, path) do

@@ -4,7 +4,7 @@ defmodule StackCoder.LocalProfile do
   alias AppKit.Core.Substrate.ProfileBundle
   alias StackCoder.LocalPack
 
-  @spec bundle() :: {:ok, ProfileBundle.t()} | {:error, term()}
+  @spec bundle() :: {:ok, struct()} | {:error, term()}
   def bundle do
     ProfileBundle.new(%{
       source_profile_ref: LocalPack.source_profile_ref(),
@@ -18,7 +18,7 @@ defmodule StackCoder.LocalProfile do
     })
   end
 
-  @spec bundle!() :: ProfileBundle.t()
+  @spec bundle!() :: struct()
   def bundle! do
     case bundle() do
       {:ok, bundle} ->
