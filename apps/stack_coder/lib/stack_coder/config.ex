@@ -1,6 +1,8 @@
 defmodule StackCoder.Config do
   @moduledoc "Local Profile B defaults."
 
+  alias StackCoder.Redaction
+
   @default_trace_id "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   @default_tenant_ref "tenant://stack-coder/local"
   @default_installation_ref "installation://stack-coder/local"
@@ -45,7 +47,8 @@ defmodule StackCoder.Config do
         Keyword.get(opts, :release_manifest_ref, @default_release_manifest_ref),
       fixture_script: Keyword.get(opts, :fixture_script, "success_first_try"),
       max_turns: Keyword.get(opts, :max_turns, 1),
-      output_root: Keyword.get(opts, :output_root, "tmp/stack_coder_runs")
+      output_root: Keyword.get(opts, :output_root, "tmp/stack_coder_runs"),
+      redaction_values: Redaction.values(Keyword.get(opts, :redaction_values, []))
     }
   end
 end

@@ -3,6 +3,15 @@ defmodule StackCoder.LocalE2ETest do
 
   alias StackCoder.{LocalHost, Presenter, Receipt, RuntimeAdapter}
 
+  @ambient_env [
+    {"STACK_CODER_PROVIDER_CREDENTIAL", "sk-stack-coder-env-provider"},
+    {"STACK_CODER_BASE_URL", "https://env.stack-coder.invalid"},
+    {"STACK_CODER_AUTH_ROOT", "/home/env/.stack-coder-auth"},
+    {"STACK_CODER_TOOL_PERMISSIONS", "env-tool-permissions"},
+    {"STACK_CODER_TARGET_REF", "target://env/stack-coder"},
+    {"STACK_CODER_WORKSPACE_SECRET", "workspace-env-secret"}
+  ]
+
   @tag :profile_b_local_offline
   test "runs a provider-free local turn through AppKit and writes receipt artifacts" do
     RuntimeAdapter.reset!()
@@ -119,6 +128,74 @@ defmodule StackCoder.LocalE2ETest do
     assert_no_source_hits(atom_conversion_tokens(), code_files())
   end
 
+  test "ambient env cannot select StackCoder task authority" do
+    with_restored_env(@ambient_env, fn ->
+      assert {:ok, request} =
+               LocalHost.request_for_task("ambient env proof",
+                 idempotency_key: "agent-run:start:stack-coder:ambient-env",
+                 submission_dedupe_key: "stack-coder-ambient-env"
+               )
+
+      encoded = inspect(request)
+
+      Enum.each(@ambient_env, fn {_name, value} ->
+        refute String.contains?(encoded, value)
+      end)
+    end)
+  end
+
+  test "unmanaged env authority inputs are rejected before task dispatch" do
+    for {field, value} <- authority_fields() do
+      assert {:error, {:unmanaged_env_authority, ^field}} =
+               LocalHost.request_for_task(%{
+                 "objective" => "reject unmanaged env",
+                 Atom.to_string(field) => value
+               })
+
+      assert {:error, {:unmanaged_env_authority, ^field}} =
+               LocalHost.request_for_task("reject unmanaged env", [{field, value}])
+    end
+  end
+
+  @tag :profile_b_local_offline
+  test "readback artifacts redact env-derived values supplied by the caller" do
+    secret = "stack-coder-env-readback-secret"
+
+    with_restored_env([{"STACK_CODER_READBACK_SECRET", secret}], fn ->
+      RuntimeAdapter.reset!()
+
+      output_root =
+        Path.join([
+          "tmp",
+          "env_redaction",
+          "#{System.unique_integer([:positive])}"
+        ])
+
+      receipt_path = Path.join(output_root, "receipt.json")
+
+      assert {:ok, run} =
+               LocalHost.run("redaction proof",
+                 idempotency_key: "agent-run:start:stack-coder:redaction",
+                 submission_dedupe_key: "stack-coder-redaction",
+                 subject_ref: "subject://stack-coder/#{secret}",
+                 output_root: output_root,
+                 receipt_path: receipt_path,
+                 redaction_values: [secret],
+                 json?: true
+               )
+
+      presentation = Presenter.render(run.presentation, json?: true)
+      refute String.contains?(presentation, secret)
+      assert String.contains?(presentation, "[REDACTED]")
+
+      for {_name, path} <- run.artifact_paths do
+        contents = File.read!(path)
+
+        refute String.contains?(contents, secret)
+      end
+    end)
+  end
+
   test "runtime modules do not import lower runtime internals or provider selectors" do
     lib_files = runtime_files()
 
@@ -142,12 +219,38 @@ defmodule StackCoder.LocalE2ETest do
   end
 
   defp code_files do
-    Path.wildcard("{lib,test}/**/*.{ex,exs}")
+    source_files(["lib", "test"], [".ex", ".exs"])
     |> Enum.map(&{&1, File.read!(&1)})
   end
 
   defp runtime_files do
-    Path.wildcard("lib/**/*.ex")
+    source_files(["lib"], [".ex"])
+  end
+
+  defp source_files(roots, extensions) do
+    roots
+    |> Enum.flat_map(&walk_files/1)
+    |> Enum.filter(&source_extension?(&1, extensions))
+    |> Enum.sort()
+  end
+
+  defp walk_files(path) do
+    cond do
+      File.dir?(path) ->
+        path
+        |> File.ls!()
+        |> Enum.flat_map(&walk_files(Path.join(path, &1)))
+
+      File.regular?(path) ->
+        [path]
+
+      true ->
+        []
+    end
+  end
+
+  defp source_extension?(path, extensions) do
+    Enum.any?(extensions, &String.ends_with?(path, &1))
   end
 
   defp pattern_engine_tokens do
@@ -172,6 +275,36 @@ defmodule StackCoder.LocalE2ETest do
       "list_to_" <> "atom",
       "list_to_existing_" <> "atom"
     ]
+  end
+
+  defp authority_fields do
+    [
+      provider_credential: "sk-stack-coder-env-provider",
+      provider_credentials: "sk-stack-coder-env-provider",
+      api_key: "sk-stack-coder-env-provider",
+      base_url: "https://env.stack-coder.invalid",
+      auth_root: "/home/env/.stack-coder-auth",
+      tool_permissions: "env-tool-permissions",
+      target_ref: "target://env/stack-coder",
+      workspace_secret: "workspace-env-secret"
+    ]
+  end
+
+  defp with_restored_env(pairs, fun) do
+    previous =
+      Map.new(pairs, fn {name, _value} ->
+        {name, System.fetch_env(name)}
+      end)
+
+    try do
+      Enum.each(pairs, fn {name, value} -> System.put_env(name, value) end)
+      fun.()
+    after
+      Enum.each(previous, fn
+        {name, {:ok, value}} -> System.put_env(name, value)
+        {name, :error} -> System.delete_env(name)
+      end)
+    end
   end
 
   defp assert_no_source_hits(tokens, files, reason \\ "contains forbidden source token") do

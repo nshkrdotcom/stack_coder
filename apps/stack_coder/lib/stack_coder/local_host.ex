@@ -3,16 +3,26 @@ defmodule StackCoder.LocalHost do
 
   alias AppKit.Core.AgentIntake.AgentRunRequest
   alias AppKit.HeadlessSurface
-  alias StackCoder.{AppKitContext, Config, LocalPack, LocalProfile, Presenter, Receipt}
+
+  alias StackCoder.{
+    AppKitContext,
+    AuthorityGuard,
+    Config,
+    LocalPack,
+    LocalProfile,
+    Presenter,
+    Receipt,
+    Redaction
+  }
 
   @backend StackCoder.AppKitBackend
   @runtime StackCoder.RuntimeAdapter
 
   @spec run(String.t() | map(), keyword()) :: {:ok, map()} | {:error, term()}
   def run(task, opts \\ []) do
-    config = Config.defaults(opts)
-
-    with {:ok, context} <- AppKitContext.new(opts),
+    with :ok <- AuthorityGuard.reject_unmanaged_input(task, opts),
+         config = Config.defaults(opts),
+         {:ok, context} <- AppKitContext.new(opts),
          {:ok, request} <- agent_run_request(task, config),
          {:ok, future} <- AppKit.AgentIntake.start_agent_run(context, request, appkit_opts(opts)),
          {:ok, projection} <- @runtime.projection(future.run_ref),
@@ -25,7 +35,11 @@ defmodule StackCoder.LocalHost do
            subject_ref: config.subject_ref,
            trace_id: config.trace_id
          },
-         receipt <- Receipt.build(run, release_manifest_ref: config.release_manifest_ref),
+         receipt <-
+           Receipt.build(run,
+             release_manifest_ref: config.release_manifest_ref,
+             redaction_values: config.redaction_values
+           ),
          :ok <- Receipt.validate(receipt),
          artifact_paths <- write_artifacts!(run, receipt, config, opts) do
       run = Map.put(run, :receipt, receipt)
@@ -33,46 +47,51 @@ defmodule StackCoder.LocalHost do
       {:ok,
        run
        |> Map.put(:artifact_paths, artifact_paths)
-       |> Map.put(:presentation, Presenter.present_run(run, opts))}
+       |> Map.put(:presentation, Presenter.present_run(run, presenter_opts(opts, config)))}
     end
   end
 
   @spec detail(String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def detail(run_ref, opts \\ []) do
-    config = Config.defaults(opts)
-
-    with {:ok, context} <- AppKitContext.new(opts),
+    with :ok <- AuthorityGuard.reject_unmanaged_input(%{}, opts),
+         config = Config.defaults(opts),
+         {:ok, context} <- AppKitContext.new(opts),
          {:ok, projection} <- @runtime.projection(run_ref),
          {:ok, detail} <- read_detail(context, run_ref, projection, config) do
-      {:ok, Presenter.present_detail(detail)}
+      {:ok, Presenter.present_detail(detail, presenter_opts(opts, config))}
     end
   end
 
   @spec events(String.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def events(run_ref, opts \\ []) do
-    config = Config.defaults(opts)
-
-    with {:ok, context} <- AppKitContext.new(opts),
+    with :ok <- AuthorityGuard.reject_unmanaged_input(%{}, opts),
+         config = Config.defaults(opts),
+         {:ok, context} <- AppKitContext.new(opts),
          {:ok, projection} <- @runtime.projection(run_ref),
          {:ok, detail} <- read_detail(context, run_ref, projection, config) do
-      {:ok, Presenter.present_events(detail.events)}
+      {:ok, Presenter.present_events(detail.events, presenter_opts(opts, config))}
     end
   end
 
   @spec cancel(String.t(), keyword()) :: {:ok, map()} | {:error, term()}
   def cancel(run_ref, opts \\ []) do
-    with {:ok, context} <- AppKitContext.new(opts),
+    with :ok <- AuthorityGuard.reject_unmanaged_input(%{}, opts),
+         config = Config.defaults(opts),
+         {:ok, context} <- AppKitContext.new(opts),
          {:ok, command} <-
            AppKit.AgentIntake.cancel_agent_run(context, run_ref, appkit_opts(opts)) do
-      {:ok, Presenter.present_command(command)}
+      {:ok, Presenter.present_command(command, presenter_opts(opts, config))}
     end
   end
 
   @spec request_for_task(String.t() | map(), keyword()) ::
           {:ok, struct()} | {:error, term()}
   def request_for_task(task, opts \\ []) do
-    Config.defaults(opts)
-    |> then(&agent_run_request(task, &1))
+    with :ok <- AuthorityGuard.reject_unmanaged_input(task, opts) do
+      opts
+      |> Config.defaults()
+      |> then(&agent_run_request(task, &1))
+    end
   end
 
   defp agent_run_request(task, config) do
@@ -139,6 +158,7 @@ defmodule StackCoder.LocalHost do
 
   defp write_artifacts!(run, receipt, config, opts) do
     run_dir = Path.join(config.output_root, hash_suffix(run.future.run_ref))
+    redaction_values = config.redaction_values
 
     artifacts = %{
       "projection" => Path.join(run_dir, "projection.json"),
@@ -151,17 +171,26 @@ defmodule StackCoder.LocalHost do
 
     File.write!(
       artifacts["projection"],
-      Jason.encode!(present_projection(run.projection), pretty: true) <> "\n"
+      Jason.encode!(Redaction.redact(present_projection(run.projection), redaction_values),
+        pretty: true
+      ) <> "\n"
     )
 
     File.write!(
       artifacts["events"],
-      Jason.encode!(Presenter.present_events(run.detail.events), pretty: true) <> "\n"
+      Jason.encode!(
+        Presenter.present_events(run.detail.events, redaction_values: redaction_values),
+        pretty: true
+      ) <> "\n"
     )
 
     Receipt.write!(receipt, artifacts["receipt"])
 
     artifacts
+  end
+
+  defp presenter_opts(opts, config) do
+    Keyword.put(opts, :redaction_values, config.redaction_values)
   end
 
   defp present_projection(projection) do

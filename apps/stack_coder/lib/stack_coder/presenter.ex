@@ -3,6 +3,7 @@ defmodule StackCoder.Presenter do
 
   alias AppKit.Core.AgentIntake.RunOutcomeFuture
   alias AppKit.Core.RuntimeReadback.{CommandResult, RuntimeEventRow, RuntimeRunDetail}
+  alias StackCoder.Redaction
 
   @spec present_run(map(), keyword()) :: map()
   def present_run(
@@ -25,10 +26,13 @@ defmodule StackCoder.Presenter do
       "receipt_ref" => receipt_name(run),
       "output_mode" => if(Keyword.get(opts, :json?, false), do: "json", else: "text")
     }
+    |> Redaction.redact(Keyword.get(opts, :redaction_values, []))
   end
 
-  @spec present_detail(struct()) :: map()
-  def present_detail(%RuntimeRunDetail{} = detail) do
+  @spec present_detail(struct(), keyword()) :: map()
+  def present_detail(detail, opts \\ [])
+
+  def present_detail(%RuntimeRunDetail{} = detail, opts) do
     %{
       "schema_ref" => detail.schema_ref,
       "run_ref" => detail.run_ref,
@@ -40,13 +44,20 @@ defmodule StackCoder.Presenter do
       "candidate_fact_refs" => detail.candidate_fact_refs,
       "memory_proof_refs" => detail.memory_proof_refs
     }
+    |> Redaction.redact(Keyword.get(opts, :redaction_values, []))
   end
 
-  @spec present_events([struct()]) :: [map()]
-  def present_events(events), do: Enum.map(events, &present_event/1)
+  @spec present_events([struct()], keyword()) :: [map()]
+  def present_events(events, opts \\ []) do
+    events
+    |> Enum.map(&present_event/1)
+    |> Redaction.redact(Keyword.get(opts, :redaction_values, []))
+  end
 
-  @spec present_command(struct()) :: map()
-  def present_command(%CommandResult{} = command) do
+  @spec present_command(struct(), keyword()) :: map()
+  def present_command(command, opts \\ [])
+
+  def present_command(%CommandResult{} = command, opts) do
     %{
       "schema_ref" => "runtime_readback/command_result.v1",
       "command_ref" => command.command_ref,
@@ -56,6 +67,7 @@ defmodule StackCoder.Presenter do
       "workflow_effect_state" => command.workflow_effect_state,
       "projection_state" => to_string(command.projection_state)
     }
+    |> Redaction.redact(Keyword.get(opts, :redaction_values, []))
   end
 
   @spec render(map() | [map()], keyword()) :: String.t()

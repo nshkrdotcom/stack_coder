@@ -3,7 +3,7 @@ defmodule StackCoder.Receipt do
 
   alias AppKit.Core.AgentIntake.RunOutcomeFuture
   alias AppKit.Core.RuntimeReadback.{RuntimeRunDetail, Support}
-  alias StackCoder.Presenter
+  alias StackCoder.{Presenter, Redaction}
 
   @receipt_name "agentic_substrate_local_e2e_v1"
 
@@ -16,7 +16,12 @@ defmodule StackCoder.Receipt do
         } = run,
         opts \\ []
       ) do
-    presented = Presenter.present_run(run, json?: true)
+    presented =
+      Presenter.present_run(run,
+        json?: true,
+        redaction_values: Keyword.get(opts, :redaction_values, [])
+      )
+
     readback = Support.dump_struct(detail)
     ref_set = Map.get(projection, :receipt_ref_set, %{})
 
@@ -61,6 +66,7 @@ defmodule StackCoder.Receipt do
         ),
       "receipt_state" => "proven"
     }
+    |> Redaction.redact(Keyword.get(opts, :redaction_values, []))
   end
 
   @spec validate(map()) :: :ok | {:error, term()}

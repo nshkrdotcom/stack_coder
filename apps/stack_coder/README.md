@@ -9,6 +9,19 @@
 
 An advanced Elixir-based AI coding agent focused on full-stack code generation, orchestration, and intelligent source code management.
 
+## Authority and env governance
+
+StackCoder's local Profile B host does not read ambient env to choose provider
+keys, base URLs, auth roots, tool permissions, target refs, or workspace
+secrets. Product task dispatch enters through AppKit request/readback surfaces
+and rejects unmanaged authority-bearing fields before a run is accepted.
+
+Caller-supplied redaction literals can be passed with `redaction_values:` for
+local readback and receipt artifact writing. Redaction is implemented with
+fixed literal matching and deterministic traversal; regex modules, regex
+sigils, dynamic atom conversion, and regex-backed scanners are not allowed in
+runtime code, tests, fixtures, build helpers, or repo-owned QC helpers.
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
