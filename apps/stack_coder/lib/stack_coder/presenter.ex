@@ -3,7 +3,7 @@ defmodule StackCoder.Presenter do
 
   alias AppKit.Core.AgentIntake.RunOutcomeFuture
   alias AppKit.Core.RuntimeReadback.{CommandResult, RuntimeEventRow, RuntimeRunDetail}
-  alias StackCoder.Redaction
+  alias StackCoder.{Redaction, RuntimePolicy}
 
   @spec present_run(map(), keyword()) :: map()
   def present_run(
@@ -16,7 +16,7 @@ defmodule StackCoder.Presenter do
       "run_ref" => future.run_ref,
       "workflow_ref" => future.workflow_ref,
       "subject_ref" => run.subject_ref,
-      "terminal_state" => detail.runtime_row.state,
+      "terminal_state" => RuntimePolicy.task_state!(detail.runtime_row.state),
       "event_count" => length(detail.events),
       "events" => Enum.map(detail.events, &present_event/1),
       "turns" => detail.turns,
@@ -36,7 +36,7 @@ defmodule StackCoder.Presenter do
     %{
       "schema_ref" => detail.schema_ref,
       "run_ref" => detail.run_ref,
-      "state" => detail.runtime_row.state,
+      "state" => RuntimePolicy.task_state!(detail.runtime_row.state),
       "workflow_ref" => detail.runtime_row.workflow_ref,
       "events" => Enum.map(detail.events, &present_event/1),
       "turns" => detail.turns,
@@ -61,7 +61,8 @@ defmodule StackCoder.Presenter do
     %{
       "schema_ref" => "runtime_readback/command_result.v1",
       "command_ref" => command.command_ref,
-      "command_kind" => to_string(command.command_kind),
+      "command_kind" =>
+        command.command_kind |> RuntimePolicy.operator_action_kind!() |> to_string(),
       "accepted?" => command.accepted?,
       "status" => to_string(command.status),
       "workflow_effect_state" => command.workflow_effect_state,
@@ -93,7 +94,7 @@ defmodule StackCoder.Presenter do
     %{
       "event_ref" => event.event_ref,
       "event_seq" => event.event_seq,
-      "event_kind" => event.event_kind,
+      "event_kind" => RuntimePolicy.readback_event_kind!(event.event_kind),
       "message_summary" => event.message_summary,
       "run_ref" => event.run_ref,
       "turn_ref" => event.turn_ref

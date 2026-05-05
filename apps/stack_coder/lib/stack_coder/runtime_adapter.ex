@@ -6,6 +6,8 @@ defmodule StackCoder.RuntimeAdapter do
   still starts and reads runs through AppKit surfaces.
   """
 
+  alias Mezzanine.WorkflowRuntime.AgentLoop
+
   @table __MODULE__.Table
 
   @spec run(map()) :: {:ok, struct()} | {:error, term()}
@@ -48,6 +50,6 @@ defmodule StackCoder.RuntimeAdapter do
   end
 
   defp agent_loop_module do
-    Module.concat([:Mezzanine, :WorkflowRuntime, :AgentLoop])
+    AgentLoop
   end
 end

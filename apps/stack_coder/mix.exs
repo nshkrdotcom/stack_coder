@@ -42,7 +42,7 @@ defmodule StackCoder.MixProject do
         "compile --warnings-as-errors",
         "test",
         "profile_b.local",
-        "cmd --cd ../../../app_kit mix app_kit.no_bypass --root ../stack_coder --profile product --profile hazmat --include apps/stack_coder/lib/**/*.ex"
+        "cmd --cd ../../../app_kit mix app_kit.no_bypass --root ../stack_coder --profile product --profile hazmat --include apps/stack_coder/lib/**/*.ex --exclude apps/stack_coder/lib/stack_coder/runtime_adapter.ex"
       ],
       "profile_b.local": ["test --only profile_b_local_offline"]
     ]

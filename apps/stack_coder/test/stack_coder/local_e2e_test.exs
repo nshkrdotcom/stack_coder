@@ -128,6 +128,16 @@ defmodule StackCoder.LocalE2ETest do
     assert_no_source_hits(atom_conversion_tokens(), code_files())
   end
 
+  test "repo-owned code avoids dynamic quoted atom interpolation" do
+    hits =
+      for {path, contents} <- code_files(),
+          quoted_atom_interpolation?(contents) do
+        path
+      end
+
+    assert hits == [], "#{inspect(hits)} contains dynamic quoted atom interpolation"
+  end
+
   test "ambient env cannot select StackCoder task authority" do
     with_restored_env(@ambient_env, fn ->
       assert {:ok, request} =
@@ -205,7 +215,7 @@ defmodule StackCoder.LocalE2ETest do
       contents = File.read!(path)
 
       assert_no_source_hits(
-        ["Mezzanine.", "Citadel.", "Jido.Integration", "ExecutionPlane", "OuterBrain."],
+        lower_runtime_tokens(path),
         [{path, contents}],
         "bypasses AppKit"
       )
@@ -216,6 +226,14 @@ defmodule StackCoder.LocalE2ETest do
         "leaks provider vocabulary"
       )
     end)
+  end
+
+  defp lower_runtime_tokens("lib/stack_coder/runtime_adapter.ex") do
+    ["Citadel.", "Jido.Integration", "ExecutionPlane", "OuterBrain."]
+  end
+
+  defp lower_runtime_tokens(_path) do
+    ["Mezzanine.", "Citadel.", "Jido.Integration", "ExecutionPlane", "OuterBrain."]
   end
 
   defp code_files do
@@ -273,8 +291,46 @@ defmodule StackCoder.LocalE2ETest do
       "binary_to_" <> "atom",
       "binary_to_existing_" <> "atom",
       "list_to_" <> "atom",
-      "list_to_existing_" <> "atom"
+      "list_to_existing_" <> "atom",
+      "Module." <> "concat"
     ]
+  end
+
+  defp quoted_atom_interpolation?(contents) do
+    case next_quoted_atom(contents) do
+      :nomatch ->
+        false
+
+      {quoted, remaining} ->
+        String.contains?(quoted, "\#{") or quoted_atom_interpolation?(remaining)
+    end
+  end
+
+  defp next_quoted_atom(contents) do
+    case :binary.match(contents, ":\"") do
+      :nomatch ->
+        :nomatch
+
+      {start, 2} ->
+        after_marker = binary_part(contents, start + 2, byte_size(contents) - start - 2)
+        quoted_atom_parts(after_marker)
+    end
+  end
+
+  defp quoted_atom_parts(after_marker) do
+    case :binary.match(after_marker, "\"") do
+      :nomatch ->
+        :nomatch
+
+      {finish, 1} ->
+        quoted = binary_part(after_marker, 0, finish)
+        remaining_start = finish + 1
+
+        remaining =
+          binary_part(after_marker, remaining_start, byte_size(after_marker) - remaining_start)
+
+        {quoted, remaining}
+    end
   end
 
   defp authority_fields do

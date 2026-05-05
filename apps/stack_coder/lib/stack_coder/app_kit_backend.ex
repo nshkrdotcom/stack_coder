@@ -21,7 +21,7 @@ defmodule StackCoder.AppKitBackend do
     RuntimeSubjectDetail
   }
 
-  alias StackCoder.RuntimeAdapter
+  alias StackCoder.{RuntimeAdapter, RuntimePolicy}
 
   @timestamp ~U[2026-04-27 00:00:00Z]
 
@@ -48,7 +48,8 @@ defmodule StackCoder.AppKitBackend do
 
   @impl AppKit.Core.Backends.AgentIntakeBackend
   def submit_agent_turn(_context, turn_submission, opts) do
-    if runtime_available?(Keyword.get(opts, :agent_loop_runtime, RuntimeAdapter)) do
+    with :ok <- RuntimePolicy.validate_operator_action_kind(:submit_turn),
+         true <- runtime_available?(Keyword.get(opts, :agent_loop_runtime, RuntimeAdapter)) do
       CommandResult.new(%{
         command_ref: "command://#{turn_submission.idempotency_key}",
         command_kind: :submit_turn,
@@ -64,13 +65,15 @@ defmodule StackCoder.AppKitBackend do
         message: "Agent turn submission accepted through AppKit"
       })
     else
-      {:error, :agent_turn_runtime_not_available}
+      false -> {:error, :agent_turn_runtime_not_available}
+      {:error, reason} -> {:error, reason}
     end
   end
 
   @impl AppKit.Core.Backends.AgentIntakeBackend
   def cancel_agent_run(_context, run_ref, opts) do
-    if runtime_available?(Keyword.get(opts, :agent_loop_runtime, RuntimeAdapter)) do
+    with :ok <- RuntimePolicy.validate_operator_action_kind(:cancel),
+         true <- runtime_available?(Keyword.get(opts, :agent_loop_runtime, RuntimeAdapter)) do
       CommandResult.new(%{
         command_ref: "command://cancel/#{ref_suffix(run_ref)}",
         command_kind: :cancel,
@@ -86,7 +89,8 @@ defmodule StackCoder.AppKitBackend do
         message: "Agent run cancellation accepted through AppKit"
       })
     else
-      {:error, :agent_turn_runtime_not_available}
+      false -> {:error, :agent_turn_runtime_not_available}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -136,19 +140,21 @@ defmodule StackCoder.AppKitBackend do
 
     with true <- not is_nil(projection),
          projection_map <- public_map(projection),
+         state <- map_value(projection_map, :status),
+         :ok <- RuntimePolicy.validate_task_state(state),
          {:ok, row} <-
            RuntimeRow.new(%{
              subject_ref: map_value(projection_map, :subject_ref),
              run_ref: run_ref,
              workflow_ref: map_value(projection_map, :workflow_ref),
-             state: map_value(projection_map, :status),
+             state: state,
              updated_at: @timestamp,
              polling_state: %{checking?: false, poll_interval_ms: 1_000, staleness_ms: 0}
            }),
          {:ok, events} <-
            projection_map
            |> map_value(:runtime_events, [])
-           |> Enum.map(&RuntimeEventRow.new/1)
+           |> Enum.map(&runtime_event_row/1)
            |> collect_ok() do
       RuntimeRunDetail.new(%{
         run_ref: run_ref,
@@ -168,36 +174,40 @@ defmodule StackCoder.AppKitBackend do
 
   @impl AppKit.Core.Backends.HeadlessBackend
   def request_runtime_refresh(_context, request, _opts) do
-    CommandResult.new(%{
-      command_ref: "command://#{request.idempotency_key}",
-      command_kind: :refresh,
-      accepted?: true,
-      coalesced?: false,
-      status: :accepted,
-      authority_state: :local_policy,
-      authority_refs: [],
-      workflow_effect_state: "pending_signal",
-      projection_state: :pending,
-      idempotency_key: request.idempotency_key,
-      message: "Refresh command accepted through AppKit"
-    })
+    with :ok <- RuntimePolicy.validate_operator_action_kind(:refresh) do
+      CommandResult.new(%{
+        command_ref: "command://#{request.idempotency_key}",
+        command_kind: :refresh,
+        accepted?: true,
+        coalesced?: false,
+        status: :accepted,
+        authority_state: :local_policy,
+        authority_refs: [],
+        workflow_effect_state: "pending_signal",
+        projection_state: :pending,
+        idempotency_key: request.idempotency_key,
+        message: "Refresh command accepted through AppKit"
+      })
+    end
   end
 
   @impl AppKit.Core.Backends.HeadlessBackend
   def request_runtime_control(_context, request, _opts) do
-    CommandResult.new(%{
-      command_ref: "command://#{request.idempotency_key}",
-      command_kind: request.action,
-      accepted?: true,
-      coalesced?: false,
-      status: :accepted,
-      authority_state: :local_policy,
-      authority_refs: [],
-      workflow_effect_state: "pending_signal",
-      projection_state: :pending,
-      idempotency_key: request.idempotency_key,
-      message: "Control command accepted through AppKit"
-    })
+    with :ok <- RuntimePolicy.validate_operator_action_kind(request.action) do
+      CommandResult.new(%{
+        command_ref: "command://#{request.idempotency_key}",
+        command_kind: request.action,
+        accepted?: true,
+        coalesced?: false,
+        status: :accepted,
+        authority_state: :local_policy,
+        authority_refs: [],
+        workflow_effect_state: "pending_signal",
+        projection_state: :pending,
+        idempotency_key: request.idempotency_key,
+        message: "Control command accepted through AppKit"
+      })
+    end
   end
 
   defp agent_run_spec_attrs(context, request) do
@@ -205,31 +215,35 @@ defmodule StackCoder.AppKitBackend do
     profile_bundle = request.profile_bundle
     run_ref = map_value(params, :run_ref, "run://stack-coder/#{request.submission_dedupe_key}")
 
-    {:ok,
-     %{
-       tenant_ref: request.tenant_ref,
-       installation_ref: request.installation_ref,
-       profile_ref: map_value(params, :profile_ref, "profile://stack-coder/local-fixture/v1"),
-       subject_ref: request.subject_ref,
-       run_ref: run_ref,
-       session_ref: map_value(params, :session_ref),
-       workspace_ref: map_value(params, :workspace_ref),
-       worker_ref: map_value(params, :worker_ref),
-       trace_id: request.trace_id,
-       idempotency_key: request.idempotency_key,
-       objective: request.initial_input_ref,
-       runtime_profile_ref: profile_bundle.runtime_profile_ref,
-       tool_catalog_ref: request.tool_catalog_ref,
-       authority_context_ref: map_value(params, :authority_context_ref),
-       memory_profile_ref: profile_bundle.memory_profile_ref,
-       artifact_policy_ref: map_value(params, :artifact_policy_ref),
-       max_turns: map_value(params, :max_turns, 1),
-       timeout_policy: %{turn_timeout_ms: 30_000},
-       profile_bundle: Map.from_struct(profile_bundle),
-       fixture_script: map_value(params, :fixture_script, "success_first_try"),
-       release_manifest_ref: map_value(params, :release_manifest_ref),
-       source_ref: "actor://#{context.actor_ref.id}"
-     }}
+    with :ok <- RuntimePolicy.validate_provider_selection_mode(:provider_free_local),
+         :ok <- RuntimePolicy.validate_target_mode(:appkit_local_profile_b),
+         :ok <- RuntimePolicy.validate_operator_action_kind(:start_run) do
+      {:ok,
+       %{
+         tenant_ref: request.tenant_ref,
+         installation_ref: request.installation_ref,
+         profile_ref: map_value(params, :profile_ref, "profile://stack-coder/local-fixture/v1"),
+         subject_ref: request.subject_ref,
+         run_ref: run_ref,
+         session_ref: map_value(params, :session_ref),
+         workspace_ref: map_value(params, :workspace_ref),
+         worker_ref: map_value(params, :worker_ref),
+         trace_id: request.trace_id,
+         idempotency_key: request.idempotency_key,
+         objective: request.initial_input_ref,
+         runtime_profile_ref: profile_bundle.runtime_profile_ref,
+         tool_catalog_ref: request.tool_catalog_ref,
+         authority_context_ref: map_value(params, :authority_context_ref),
+         memory_profile_ref: profile_bundle.memory_profile_ref,
+         artifact_policy_ref: map_value(params, :artifact_policy_ref),
+         max_turns: map_value(params, :max_turns, 1),
+         timeout_policy: %{turn_timeout_ms: 30_000},
+         profile_bundle: Map.from_struct(profile_bundle),
+         fixture_script: map_value(params, :fixture_script, "success_first_try"),
+         release_manifest_ref: map_value(params, :release_manifest_ref),
+         source_ref: "actor://#{context.actor_ref.id}"
+       }}
+    end
   end
 
   defp runtime_available?(runtime) when is_atom(runtime),
@@ -245,6 +259,12 @@ defmodule StackCoder.AppKitBackend do
   defp public_map(%{} = value), do: Map.new(value, fn {key, val} -> {key, public_map(val)} end)
   defp public_map(values) when is_list(values), do: Enum.map(values, &public_map/1)
   defp public_map(value), do: value
+
+  defp runtime_event_row(attrs) do
+    with :ok <- RuntimePolicy.validate_readback_event_kind(map_value(attrs, :event_kind)) do
+      RuntimeEventRow.new(attrs)
+    end
+  end
 
   defp collect_ok(results) do
     Enum.reduce_while(results, {:ok, []}, fn
