@@ -1,0 +1,14 @@
+/_build/
+/deps/
+/doc/
+/apps/*/_build/
+/apps/*/deps/
+/apps/*/doc/
+.dependency_sources.local.exs
+apps/*/.dependency_sources.local.exs
+*.ez
+*.beam
+erl_crash.dump
+.DS_Store
+/cover/
+/tmp/

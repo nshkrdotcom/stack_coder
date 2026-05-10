@@ -1,3 +1,7 @@
+unless Code.ensure_loaded?(DependencySources) do
+  Code.require_file("build_support/dependency_sources.exs", __DIR__)
+end
+
 defmodule StackCoder.MixProject do
   use Mix.Project
 
@@ -12,6 +16,7 @@ defmodule StackCoder.MixProject do
       deps: deps(),
       aliases: aliases(),
       docs: docs(),
+      package: package(),
       name: "StackCoder",
       description: "Provider-free local Profile B host over AppKit",
       source_url: @source_url,
@@ -58,13 +63,42 @@ defmodule StackCoder.MixProject do
 
   defp deps do
     [
-      {:app_kit_core, path: "../../../app_kit/core/app_kit_core"},
-      {:mezzanine_workflow_runtime, path: "../../../mezzanine/core/workflow_runtime"},
-      {:jido_integration_contracts,
-       path: "../../../jido_integration/core/contracts", override: true},
+      DependencySources.dep(:app_kit_core, __DIR__),
+      DependencySources.dep(:mezzanine_workflow_runtime, __DIR__),
+      jido_integration_contracts_dep(),
       {:jason, "~> 1.4"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40.1", only: :dev, runtime: false}
+    ]
+  end
+
+  defp jido_integration_contracts_dep do
+    dep = DependencySources.dep(:jido_integration_contracts, __DIR__)
+
+    if hex_packaging_task?() do
+      dep
+    else
+      merge_dep_opts(dep, override: true)
+    end
+  end
+
+  defp hex_packaging_task? do
+    Enum.any?(System.argv(), &(&1 in ["hex.build", "hex.publish"]))
+  end
+
+  defp merge_dep_opts({app, dep_opts}, opts) when is_list(dep_opts),
+    do: {app, Keyword.merge(dep_opts, opts)}
+
+  defp merge_dep_opts({app, requirement}, opts), do: {app, requirement, opts}
+
+  defp merge_dep_opts({app, requirement, dep_opts}, opts),
+    do: {app, requirement, Keyword.merge(dep_opts, opts)}
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => @source_url},
+      files: ~w(lib assets build_support mix.exs README.md CHANGELOG.md LICENSE)
     ]
   end
 end

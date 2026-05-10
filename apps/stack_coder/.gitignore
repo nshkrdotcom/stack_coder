@@ -21,3 +21,5 @@ stack_coder-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+.dependency_sources.local.exs

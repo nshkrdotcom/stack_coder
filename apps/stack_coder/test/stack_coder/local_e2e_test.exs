@@ -3,7 +3,7 @@ defmodule StackCoder.LocalE2ETest do
 
   alias StackCoder.{LocalHost, Presenter, Receipt, RuntimeAdapter}
 
-  @ambient_env [
+  @ambient_authority_values [
     {"STACK_CODER_PROVIDER_CREDENTIAL", "sk-stack-coder-env-provider"},
     {"STACK_CODER_BASE_URL", "https://env.stack-coder.invalid"},
     {"STACK_CODER_AUTH_ROOT", "/home/env/.stack-coder-auth"},
@@ -138,19 +138,17 @@ defmodule StackCoder.LocalE2ETest do
     assert hits == [], "#{inspect(hits)} contains dynamic quoted atom interpolation"
   end
 
-  test "ambient env cannot select StackCoder task authority" do
-    with_restored_env(@ambient_env, fn ->
-      assert {:ok, request} =
-               LocalHost.request_for_task("ambient env proof",
-                 idempotency_key: "agent-run:start:stack-coder:ambient-env",
-                 submission_dedupe_key: "stack-coder-ambient-env"
-               )
+  test "ambient authority values cannot select StackCoder task authority" do
+    assert {:ok, request} =
+             LocalHost.request_for_task("ambient value proof",
+               idempotency_key: "agent-run:start:stack-coder:ambient-values",
+               submission_dedupe_key: "stack-coder-ambient-values"
+             )
 
-      encoded = inspect(request)
+    encoded = inspect(request)
 
-      Enum.each(@ambient_env, fn {_name, value} ->
-        refute String.contains?(encoded, value)
-      end)
+    Enum.each(@ambient_authority_values, fn {_name, value} ->
+      refute String.contains?(encoded, value)
     end)
   end
 
@@ -171,39 +169,37 @@ defmodule StackCoder.LocalE2ETest do
   test "readback artifacts redact env-derived values supplied by the caller" do
     secret = "stack-coder-env-readback-secret"
 
-    with_restored_env([{"STACK_CODER_READBACK_SECRET", secret}], fn ->
-      RuntimeAdapter.reset!()
+    RuntimeAdapter.reset!()
 
-      output_root =
-        Path.join([
-          "tmp",
-          "env_redaction",
-          "#{System.unique_integer([:positive])}"
-        ])
+    output_root =
+      Path.join([
+        "tmp",
+        "env_redaction",
+        "#{System.unique_integer([:positive])}"
+      ])
 
-      receipt_path = Path.join(output_root, "receipt.json")
+    receipt_path = Path.join(output_root, "receipt.json")
 
-      assert {:ok, run} =
-               LocalHost.run("redaction proof",
-                 idempotency_key: "agent-run:start:stack-coder:redaction",
-                 submission_dedupe_key: "stack-coder-redaction",
-                 subject_ref: "subject://stack-coder/#{secret}",
-                 output_root: output_root,
-                 receipt_path: receipt_path,
-                 redaction_values: [secret],
-                 json?: true
-               )
+    assert {:ok, run} =
+             LocalHost.run("redaction proof",
+               idempotency_key: "agent-run:start:stack-coder:redaction",
+               submission_dedupe_key: "stack-coder-redaction",
+               subject_ref: "subject://stack-coder/#{secret}",
+               output_root: output_root,
+               receipt_path: receipt_path,
+               redaction_values: [secret],
+               json?: true
+             )
 
-      presentation = Presenter.render(run.presentation, json?: true)
-      refute String.contains?(presentation, secret)
-      assert String.contains?(presentation, "[REDACTED]")
+    presentation = Presenter.render(run.presentation, json?: true)
+    refute String.contains?(presentation, secret)
+    assert String.contains?(presentation, "[REDACTED]")
 
-      for {_name, path} <- run.artifact_paths do
-        contents = File.read!(path)
+    for {_name, path} <- run.artifact_paths do
+      contents = File.read!(path)
 
-        refute String.contains?(contents, secret)
-      end
-    end)
+      refute String.contains?(contents, secret)
+    end
   end
 
   test "runtime modules do not import lower runtime internals or provider selectors" do
@@ -344,23 +340,6 @@ defmodule StackCoder.LocalE2ETest do
       target_ref: "target://env/stack-coder",
       workspace_secret: "workspace-env-secret"
     ]
-  end
-
-  defp with_restored_env(pairs, fun) do
-    previous =
-      Map.new(pairs, fn {name, _value} ->
-        {name, System.fetch_env(name)}
-      end)
-
-    try do
-      Enum.each(pairs, fn {name, value} -> System.put_env(name, value) end)
-      fun.()
-    after
-      Enum.each(previous, fn
-        {name, {:ok, value}} -> System.put_env(name, value)
-        {name, :error} -> System.delete_env(name)
-      end)
-    end
   end
 
   defp assert_no_source_hits(tokens, files, reason \\ "contains forbidden source token") do

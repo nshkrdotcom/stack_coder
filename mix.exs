@@ -1,3 +1,7 @@
+unless Code.ensure_loaded?(DependencySources) do
+  Code.require_file("build_support/dependency_sources.exs", __DIR__)
+end
+
 defmodule StackCoderWorkspace.MixProject do
   use Mix.Project
 
@@ -6,7 +10,7 @@ defmodule StackCoderWorkspace.MixProject do
       app: :stack_coder_workspace,
       version: "0.1.0",
       elixir: "~> 1.19",
-      deps: [],
+      deps: DependencySources.deps(__DIR__),
       aliases: aliases()
     ]
   end

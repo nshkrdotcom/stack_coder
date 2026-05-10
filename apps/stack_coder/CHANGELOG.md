@@ -16,7 +16,6 @@ Versioning where practical for published artifacts.
   package, and runnable daemon, CLI, and TUI apps.
 - Workbench node IR, reusable widgets, and BEAM-native TUI runtime over
   `ex_ratatui`.
-- Weld projection metadata for the internal `switchyard_foundation` artifact.
 
 ### Changed
 
