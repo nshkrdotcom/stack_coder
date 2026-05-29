@@ -10,7 +10,7 @@ defmodule StackCoder.AppKitBackend do
   @behaviour AppKit.Core.Backends.AgentIntakeBackend
   @behaviour AppKit.Core.Backends.HeadlessBackend
 
-  alias AppKit.Core.AgentIntake.RunOutcomeFuture
+  alias AppKit.Core.AgentIntake.{AgentRunEventPage, RunOutcomeFuture}
 
   alias AppKit.Core.RuntimeReadback.{
     CommandResult,
@@ -105,6 +105,28 @@ defmodule StackCoder.AppKitBackend do
         correlation_id: map_value(request || %{}, :correlation_id, run_ref),
         polling_hint: %{checking?: false, poll_interval_ms: 1_000, staleness_ms: 0}
       })
+    else
+      {:error, :agent_turn_runtime_not_available}
+    end
+  end
+
+  @impl AppKit.Core.Backends.AgentIntakeBackend
+  def catch_up_agent_events(_context, cursor, opts) do
+    if runtime_available?(Keyword.get(opts, :agent_loop_runtime, RuntimeAdapter)) do
+      AgentRunEventPage.new(%{
+        cursor: cursor,
+        events: [],
+        has_more?: false
+      })
+    else
+      {:error, :agent_turn_runtime_not_available}
+    end
+  end
+
+  @impl AppKit.Core.Backends.AgentIntakeBackend
+  def list_pending_interactions(_context, _request, opts) do
+    if runtime_available?(Keyword.get(opts, :agent_loop_runtime, RuntimeAdapter)) do
+      {:ok, []}
     else
       {:error, :agent_turn_runtime_not_available}
     end

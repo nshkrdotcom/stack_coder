@@ -26,6 +26,7 @@ defmodule StackCoder.MixProject do
 
   def application do
     [
+      mod: {StackCoder.Application, []},
       extra_applications: [:logger]
     ]
   end
