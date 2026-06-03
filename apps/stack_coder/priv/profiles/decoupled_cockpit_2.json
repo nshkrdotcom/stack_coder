@@ -1,1 +1,32 @@
-{"app_ref":"stack_coder","profile_ref":"profile:decoupled-cockpit-2","services":["stack_coder_core"]}
+{
+  "app_atom": "stack_coder",
+  "profile_ref": "profile:decoupled-cockpit-2",
+  "environment": "prod",
+  "service_specs": [
+    {
+      "service_spec_ref": "svc:stack_coder:appkit",
+      "node_name_pattern": "appkit@*",
+      "release_name": "stack_coder",
+      "release_tarball_pattern": "stack_coder-*.tar.gz",
+      "systemd_unit_name": "nshkr_stack_coder",
+      "env_files": [],
+      "virtual_servers": ["vs_app_kit", "vs_observability"]
+    },
+    {
+      "service_spec_ref": "svc:stack_coder:stack",
+      "node_name_pattern": "stack@*",
+      "release_name": "stack_coder",
+      "release_tarball_pattern": "stack_coder-*.tar.gz",
+      "systemd_unit_name": "nshkr_stack_coder",
+      "env_files": [],
+      "virtual_servers": [
+        "vs_mezzanine",
+        "vs_outer_brain",
+        "vs_citadel",
+        "vs_jido_integration",
+        "vs_execution_plane",
+        "vs_secrets_plane"
+      ]
+    }
+  ]
+}

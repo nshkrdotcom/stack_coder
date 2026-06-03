@@ -7,8 +7,8 @@ defmodule StackCoder.Application do
     Supervisor.start_link(
       [
         StackCoder.BootstrapWorker,
-        StackCoder.ChassisRegistration,
-        StackCoder.VirtualServerSupervisor
+        {StackCoder.ChassisRegistration, app_atom: :stack_coder},
+        {StackCoder.VirtualServerSupervisor, app_atom: :stack_coder}
       ],
       strategy: :rest_for_one,
       name: StackCoder.Supervisor

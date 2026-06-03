@@ -1,1 +1,34 @@
-{"app_ref":"stack_coder","profile_ref":"profile:ternary-split-3","services":["stack_coder_core"]}
+{
+  "app_atom": "stack_coder",
+  "profile_ref": "profile:ternary-split-3",
+  "environment": "prod",
+  "service_specs": [
+    {
+      "service_spec_ref": "svc:stack_coder:appkit",
+      "node_name_pattern": "appkit@*",
+      "release_name": "stack_coder",
+      "release_tarball_pattern": "stack_coder-*.tar.gz",
+      "systemd_unit_name": "nshkr_stack_coder",
+      "env_files": [],
+      "virtual_servers": ["vs_app_kit", "vs_observability"]
+    },
+    {
+      "service_spec_ref": "svc:stack_coder:control",
+      "node_name_pattern": "control@*",
+      "release_name": "stack_coder",
+      "release_tarball_pattern": "stack_coder-*.tar.gz",
+      "systemd_unit_name": "nshkr_stack_coder",
+      "env_files": [],
+      "virtual_servers": ["vs_mezzanine", "vs_citadel", "vs_secrets_plane"]
+    },
+    {
+      "service_spec_ref": "svc:stack_coder:data",
+      "node_name_pattern": "data@*",
+      "release_name": "stack_coder",
+      "release_tarball_pattern": "stack_coder-*.tar.gz",
+      "systemd_unit_name": "nshkr_stack_coder",
+      "env_files": [],
+      "virtual_servers": ["vs_outer_brain", "vs_jido_integration", "vs_execution_plane"]
+    }
+  ]
+}

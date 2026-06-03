@@ -58,6 +58,20 @@ defmodule StackCoder.CLI do
     if Keyword.has_key?(opts, :task), do: {:run, Keyword.fetch!(opts, :task), cli_opts(opts)}
   end
 
+  defp positional_command(opts, ["run", prompt]) when is_binary(prompt),
+    do: {:run, prompt, cli_opts(opts)}
+
+  defp positional_command(opts, ["review-pr", pr_ref]) when is_binary(pr_ref),
+    do: {:run, "review pull request " <> pr_ref, cli_opts(opts)}
+
+  defp positional_command(opts, ["context.index", repo_path]) when is_binary(repo_path),
+    do:
+      {:run, %{"input_ref" => "input://stack-coder/context-index/" <> hash(repo_path)},
+       cli_opts(opts)}
+
+  defp positional_command(opts, ["turn.history" | _rest]),
+    do: {:events, "run://stack-coder/stack-coder-local-fixture", cli_opts(opts)}
+
   defp positional_command(opts, [cmd, run_ref]) when cmd in ["status", "detail"],
     do: {:detail, run_ref, cli_opts(opts)}
 
@@ -82,4 +96,10 @@ defmodule StackCoder.CLI do
   end
 
   defp print_result({:error, reason}, _key, _opts), do: {:error, reason}
+
+  defp hash(value) do
+    :crypto.hash(:sha256, value)
+    |> Base.encode16(case: :lower)
+    |> binary_part(0, 24)
+  end
 end

@@ -65,6 +65,8 @@ defmodule StackCoder.MixProject do
   defp deps do
     [
       DependencySources.dep(:app_kit_core, __DIR__),
+      DependencySources.dep(:app_kit_chassis_bridge, __DIR__),
+      DependencySources.dep(:chassis_stack, __DIR__),
       DependencySources.dep(:mezzanine_workflow_runtime, __DIR__),
       jido_integration_contracts_dep(),
       {:jason, "~> 1.4"},
